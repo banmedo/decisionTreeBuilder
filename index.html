@@ -204,6 +204,8 @@
             <div id="terminal-form" style="display:none">
               <label for="primitive">Name</label>
               <input type="text" class="form-control" id="name">
+              <label for="primitive">Class Value</label>
+              <input type="number" class="form-control" id="classnum">
             </div>
             <div id="non-terminal-form">
               <label for="primitive">Primitive</label>
@@ -231,14 +233,28 @@
       'CRP':  {band: 'cropland', threshold: 40, left: 'WTL', rightName: 'Cropland', right: 'terminal'},
       'WTL':  {band: 'wetland', threshold: 60, left: 'terminal', leftName: 'Wetland', right: 'FOR'},
       'FOR':  {band: 'forest', threshold: 40, left: 'terminal', leftName: 'Forest', right: 'GRS'},
-      'GRS':  {band: 'grassland', threshold: 40, left: '123', leftName: 'Grassland', right: 'qwe', rightName: 'Otherland'}
+      'GRS':  {band: 'grassland', threshold: 40, left: 'terminal', leftName: 'Grassland', right: 'terminal', rightName: 'Otherland'}
     };
-    tree = {'root': {band: 'example', threshold: 50, left: 'l1L', right: 'l1R'} }
 
-    //start_ind = 'SFW';
+    classStruct = { 'Otherland': {number: 0, color: '6f6f6f'},
+      'Water': {number: 1, color: '3593df'},
+      'Forest': {number: 2, color: '229a17'},
+      'Settlement': {number: 3, color: 'cc0013'},
+      'Cropland': {number: 4, color: '8dc33b'},
+      'Wetland': {number: 5, color: '3bc3b2'},
+      'Grassland': {number: 6, color: 'f4a460'}
+    };
+    // var start_ind = 'SFW';
+
+    tree = {'root': {band: 'example', threshold: 50, left: 'l1L', right: 'l1R'}};
+    classStruct = {}
     var start_ind = 'root';
 
-    var temp_stack = {};
+    var temp_stack = {'root': {band: 'example', threshold: 50, left: 'l1L', right: 'l1R'}};
+
+    function getRandomInt(int){
+      return parseInt(Math.random()*int);
+    }
 
     function newid(n) {
       var text = "";
@@ -253,8 +269,65 @@
       $(".tree").html('<ul id="root-element-container"><li id = "root-element"><a href="#" ind="root" dir="root">root</a>'+build_tree_html(tree, start_ind)+"</ul></li>");
       register_clicks();
       $("#codespace").empty();
-      $("#codespace").append("var nodeStruct = "+JSON.stringify(temp_stack));
+      $("#codespace").append("var classStruct = "+JSON.stringify(classStruct));
+      $("#codespace").append("<br><br>var nodeStruct = "+JSON.stringify(temp_stack));
       $("#codespace").append("<br><br>var startId = &#39;"+start_ind+"&#39;");
+      if ($('.non-terminal').length==0){
+        var DTstring = ['1) root 9999 9999 9999']
+        DTstring = decision(temp_stack,classStruct,start_ind,1,DTstring).sort(function(a,b){return parseInt(a)-parseInt(b)})
+        $("#codespace").append("<br><br>R Decision Tree<br>"+DTstring.join("<br>"));
+      }
+    }
+
+    function decision(nodeStruct,classStruct,id,node,DTstring){
+      // Extract parameters
+      var lnode = 2*node; // left child node number
+      var rnode = lnode + 1; // right child node number
+      var dict = nodeStruct[id]; // current dictionary
+      var band = dict.band; // decision band
+      var threshold = dict.threshold; // decision threshold
+      var left = dict.left; // left result (either 'terminal' or new id)
+      var right = dict.right; // right result (either 'terminal' or new id)
+      var leftName = dict.leftName; // left class name (if 'terminal')
+      var rightName = dict.rightName; // right class name (if 'terminal')
+      var leftLine = '';
+      var rightLine = '';
+      var leftNumber = 0;
+      var rightNumber = 0;
+
+      // Add the left condition and right condition strings to the current decision
+      // tree string. If either condition is non-terminal, recursively call the
+      // function.
+      if (left == 'terminal') { // left terminal condition
+        leftNumber = classStruct[leftName]['number'];
+        leftLine = lnode + ') ' + band + '>=' + threshold + ' 9999 9999 ' + leftNumber + ' *';
+        DTstring.push(leftLine);
+        if (right == 'terminal') { // right terminal condition
+          rightNumber = classStruct[rightName]['number'];
+          rightLine = rnode + ') ' + band + '<' + threshold + ' 9999 9999 ' + rightNumber + ' *';
+          DTstring.push(rightLine);
+          return DTstring;
+        } else { // right non-terminal condition
+          rightLine = rnode + ') ' + band + '<' + threshold + ' 9999 9999 9999';
+          DTstring.push(rightLine);
+          return decision(nodeStruct,classStruct,right,rnode,DTstring);
+        }
+      } else { // left non-terminal condition
+        leftLine = lnode + ') ' + band + '>=' + threshold + ' 9999 9999 9999';
+        DTstring.push(leftLine);
+        DTstring = decision(nodeStruct,classStruct,left,lnode,DTstring);
+        if (right == 'terminal') { // right terminal condition
+          rightNumber = classStruct[rightName]['number'];
+          rightLine = rnode + ') ' + band + '<' + threshold + ' 9999 9999 ' + rightNumber + ' *';
+          DTstring.push(rightLine);
+          return DTstring;
+        } else { // right non-terminal
+          rightLine = rnode + ') ' + band + '<' + threshold + ' 9999 9999 9999';
+          DTstring.push(rightLine);
+          return decision(nodeStruct,classStruct,right,rnode,DTstring);
+        }
+      }
+      return DTstring;
     }
 
     function build_tree_html(tree, startId){
@@ -300,10 +373,13 @@
       //if its a terminal class
       else if ($("#terminal").prop('checked')){
         var name = $("#name").val();
+        var classnum = $("#classnum").val();
         var d = (dir == 'L')? 'left':'right';
         var n = (dir == 'L')? 'leftName':'rightName';
         tree[ind][d] = 'terminal';
         tree[ind][n] = name;
+        if (classStruct[name]) classStruct[name]['number'] = classnum;
+        else classStruct[name] = {number:classnum, color:'rgb('+getRandomInt(255)+','+getRandomInt(255)+','+getRandomInt(255)+')'};
       }else {
         var threshold = parseInt($("#threshold").val());
         var primitive = $("#primitive").val();
@@ -348,6 +424,7 @@
           $("#terminal").prop('checked',true);
           var n = (dir == 'L')? 'leftName':'rightName';
           $("#name").val(tree[ind][n]);
+          $("#classnum").val(classStruct[tree[ind][n]]['number']);
           $(".modal-title").html("Configure "+tree[ind][n]);
           toggle_forms(true);
         }
