@@ -275,7 +275,7 @@
       if ($('.non-terminal').length==0){
         var DTstring = ['1) root 9999 9999 9999']
         DTstring = decision(temp_stack,classStruct,start_ind,1,DTstring).sort(function(a,b){return parseInt(a)-parseInt(b)})
-        $("#codespace").append("<br><br>R Decision Tree<br>"+DTstring.join("<br>"));
+        $("#codespace").append("<br><br>R Decision Tree<br>[&#39;"+DTstring.join("&#39;,<br>&#39;")+"&#39;]");
       }
     }
 
